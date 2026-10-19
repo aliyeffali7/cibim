@@ -25,6 +25,7 @@ type accountJSON struct {
 	Name         string    `json:"name"`
 	Type         string    `json:"type"`
 	MaskedPAN    *string   `json:"maskedPan"`
+	IBAN         string    `json:"iban"`
 	Balance      moneyJSON `json:"balance"`
 	BalanceAzn   moneyJSON `json:"balanceAzn"`
 	ConnectionID string    `json:"connectionId"`
@@ -32,7 +33,7 @@ type accountJSON struct {
 
 func accountView(acc *StoredAccount, fx map[string]string) accountJSON {
 	j := accountJSON{
-		ID: acc.ID, Bank: bankView(acc.BankCode), Name: acc.Name, Type: acc.Type,
+		ID: acc.ID, Bank: bankView(acc.BankCode), Name: acc.Name, Type: acc.Type, IBAN: acc.IBAN,
 		Balance:      moneyJSON{acc.BalanceMinor, acc.Currency},
 		BalanceAzn:   azn(toAZN(acc.BalanceMinor, acc.Currency, fx)),
 		ConnectionID: acc.ConnectionID,
