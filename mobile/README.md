@@ -1,6 +1,6 @@
 # Cibim mobile
 
-React Native (Expo SDK 58, Expo Router) app built from the Figma file "Cibim Main App Design". It talks only to the Cibim backend (`https://cibim.farahmobilya.az/api/v1` by default).
+React Native (Expo SDK 57, Expo Router) app built from the Figma file "Cibim Main App Design". It talks only to the Cibim backend (`https://cibim.farahmobilya.az/api/v1` by default).
 
 ## Run on a phone (Expo Go)
 
