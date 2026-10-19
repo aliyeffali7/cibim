@@ -2,7 +2,7 @@
 
 Cibim's own API for the mobile app, following **App API Contract v0.1**. It reads bank data from the CBAR gateway (our mock, see `../mock-cbar`), categorises it and computes what each screen shows.
 
-Go standard library only. State lives in one JSON file (`DATA_FILE`), written after every change.
+Go, with one dependency (`pgx`, vendored). Data lives in **PostgreSQL** (`DATABASE_URL`); without it the backend falls back to a JSON file (`DATA_FILE`), handy for local runs and tests.
 
 ```
 [Mobile app] ⇄ /api/v1 [backend :8080] ⇄ /v1 [mock CBAR :4000]
@@ -12,9 +12,33 @@ Go standard library only. State lives in one JSON file (`DATA_FILE`), written af
 
 ```bash
 cd ../mock-cbar && go run . &                  # bank gateway on :4000
-cd ../backend && MOCK_CBAR_URL=http://localhost:4000 go run .   # API on :8080
+cd ../backend && MOCK_CBAR_URL=http://localhost:4000 go run .   # API on :8080, JSON file storage
 go test ./...
 ```
+
+With PostgreSQL: start one (e.g. `docker compose up -d postgres`) and add
+`DATABASE_URL=postgres://cibim:cibim-dev-password@127.0.0.1:5433/cibim?sslmode=disable`.
+
+## Storage
+
+The API works on an in-memory copy of the data. After every change it rewrites the user's rows in PostgreSQL inside one transaction, and on start it loads everything back. The schema is created automatically (`pgstore.go`):
+
+| Table | Holds |
+|---|---|
+| `users` | demo users, language, profile (householder, school-age children) |
+| `connections` | bank links: consent ID, status, valid until, last sync |
+| `accounts` | synced card and current accounts with balances |
+| `transactions` | 90 days of synced bank entries (raw, as the bank sent them) |
+| `category_overrides` | categories the user changed, per transaction or per merchant |
+| `recurring_overrides`, `manual_recurring` | edits to detected recurring items, and items added by hand |
+| `loans` | loan details the user entered, and manual loans |
+| `budgets` | the user's budgets |
+| `alerts` | generated alerts with read state (`params` is JSONB) |
+| `fx_rates` | the latest CBAR rates |
+
+Categories, recurring items, safe-to-spend and so on are computed from these on each request, so they always reflect the current rules.
+
+On the first start with an empty database, an existing JSON state file is imported automatically.
 
 ## Quick start for the app
 
@@ -80,12 +104,14 @@ After a mock reset, old connections show as `failed`; link the banks again.
 
 ## Deploy on the VPS
 
-Next to the mock, behind the same domain: nginx sends `/api/` to the backend and everything else to the mock.
+Next to the mock, behind the same domain: nginx sends `/api/` to the backend and everything else to the mock. `docker compose` starts two containers: `cibim-postgres` (port 5433, localhost only) and `cibim-backend`.
 
 ```bash
 cd /opt/cibim && git pull
-cd backend && cp .env.example .env && docker compose up -d --build
+cd backend && cp .env.example .env     # set POSTGRES_PASSWORD
+docker compose up -d --build
 curl -s localhost:8080/health
+docker exec -it cibim-postgres psql -U cibim -c '\dt'   # look at the tables
 ```
 
 Add the `/api/` route to the existing nginx site (in front of `location / {`, in every server block that has one), then reload:
@@ -109,4 +135,5 @@ The app then uses `https://cibim.farahmobilya.az/api/v1`.
 | `MOCK_CBAR_URL` | `http://localhost:4000` | bank gateway base URL |
 | `APP_REDIRECT_URL` | `cibim://connections/{id}` | where the bank's approval page returns |
 | `SYNC_STALE_AFTER` | `10m` | auto-sync when data is older |
-| `DATA_FILE` | `data/state.json` | state file (`/data/state.json` in Docker) |
+| `DATABASE_URL` | empty | PostgreSQL connection string; set by docker compose |
+| `DATA_FILE` | `data/state.json` | JSON state when there is no database; imported into an empty database (`/data/state.json` in Docker) |

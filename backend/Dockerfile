@@ -1,7 +1,9 @@
+# Dependencies are vendored, so the build needs no network.
 # Build a static binary, then ship it with only CA certificates (to call the bank gateway over HTTPS).
 FROM golang:1.24-alpine AS build
 WORKDIR /src
-COPY go.mod ./
+COPY go.mod go.sum ./
+COPY vendor ./vendor
 COPY *.go ./
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /backend . \
  && mkdir /data && chown 65534:65534 /data

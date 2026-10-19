@@ -1,22 +1,49 @@
-# Runs the Cibim backend in its own container, isolated from other projects.
+# Runs the Cibim backend and its PostgreSQL database, isolated from other projects.
 # Settings come from .env next to this file (see .env.example).
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: cibim-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cibim
+      POSTGRES_USER: cibim
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cibim-dev-password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # Only reachable from this machine (for psql / an SSH tunnel), never from the internet.
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cibim -d cibim"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 256m
+    cpus: 0.5
+
   backend:
     build: .
     container_name: cibim-backend
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     environment:
       PORT: "8080"
+      DATABASE_URL: postgres://cibim:${POSTGRES_PASSWORD:-cibim-dev-password}@postgres:5432/cibim?sslmode=disable
       MOCK_CBAR_URL: ${MOCK_CBAR_URL:-https://cibim.farahmobilya.az}
       APP_REDIRECT_URL: ${APP_REDIRECT_URL:-cibim://connections/{id}}
       SYNC_STALE_AFTER: ${SYNC_STALE_AFTER:-10m}
     # 127.0.0.1 keeps the port off the internet; nginx proxies /api/ to it.
     ports:
       - "${BIND_ADDR:-127.0.0.1}:${HOST_PORT:-8080}:8080"
+    # The old JSON state lives here; on the first start with an empty database it is imported.
     volumes:
       - backend-data:/data
     mem_limit: 128m
     cpus: 0.5
 
 volumes:
+  postgres-data:
   backend-data:

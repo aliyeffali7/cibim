@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Everything the backend keeps per user. Bank data is a cache of the last sync;
@@ -156,10 +158,11 @@ func (u *UserState) account(id string) *StoredAccount {
 	return nil
 }
 
-// State is the whole backend's data, saved to one JSON file after every change.
+// State is the whole backend's data, saved to PostgreSQL (or a JSON file) after every change.
 type State struct {
 	mu    sync.Mutex
-	path  string
+	path  string                // JSON file, used when there is no database
+	db    *pgxpool.Pool         // PostgreSQL; takes over from the file when set
 	Users map[string]*UserState `json:"users"`
 	FX    map[string]string     `json:"fx"` // AZN per unit, e.g. USD → "1.7000"
 }
@@ -185,6 +188,9 @@ func LoadState(path string) (*State, error) {
 // save writes atomically: a crash mid-write never leaves a half-written file.
 // Callers hold s.mu.
 func (s *State) save() error {
+	if s.db != nil {
+		return s.saveDB()
+	}
 	if s.path == "" {
 		return nil
 	}
