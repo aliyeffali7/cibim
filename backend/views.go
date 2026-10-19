@@ -156,18 +156,21 @@ func alertView(al *Alert, lang string) alertJSON {
 }
 
 type budgetJSON struct {
-	ID       string    `json:"id"`
-	Category *Category `json:"category"`
-	Period   string    `json:"period"`
-	Limit    moneyJSON `json:"limit"`
-	Spent    moneyJSON `json:"spent"`
-	Pct      float64   `json:"pct"`
-	Status   string    `json:"status"`
-	Basis    string    `json:"basis"`
+	ID           string    `json:"id"`
+	Category     *Category `json:"category"`
+	Period       string    `json:"period"`
+	Limit        moneyJSON `json:"limit"`
+	Spent        moneyJSON `json:"spent"`
+	AlreadySpent moneyJSON `json:"alreadySpent"`
+	Pct          float64   `json:"pct"`
+	Status       string    `json:"status"`
+	Basis        string    `json:"basis"`
+	DataSince    *string   `json:"dataSince"`
 }
 
 func (a *Analysis) budgetView(b budgetView) budgetJSON {
-	j := budgetJSON{ID: b.ID, Period: b.Period, Limit: azn(b.Limit), Spent: azn(b.Spent), Pct: b.pct(), Status: b.status(), Basis: b.Basis}
+	j := budgetJSON{ID: b.ID, Period: b.Period, Limit: azn(b.Limit), Spent: azn(b.Spent), AlreadySpent: azn(b.AlreadySpent),
+		Pct: b.pct(), Status: b.status(), Basis: b.Basis, DataSince: a.dataSince()}
 	if b.Category != "" {
 		c := categoryByKey(b.Category, a.lang)
 		j.Category = &c

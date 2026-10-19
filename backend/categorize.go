@@ -26,6 +26,12 @@ var categoryDefs = []categoryDef{
 	{"telecom", "Mobil və internet", "Mobile & internet", "phone", "expense"},
 	{"subscriptions", "Abunələr", "Subscriptions", "repeat", "expense"},
 	{"shopping", "Alış-veriş", "Shopping", "bag", "expense"},
+	{"clothes", "Geyim", "Clothes", "shirt", "expense"},
+	{"home", "Ev əşyaları", "Home", "sofa", "expense"},
+	{"tech", "Texnika", "Tech", "laptop", "expense"},
+	{"school", "Məktəb", "School", "backpack", "expense"},
+	{"assets", "Əmlak və böyük alışlar", "Assets", "box", "expense"},
+	{"other", "Digər", "Other", "dots", "expense"},
 	{"health", "Səhiyyə", "Health", "pill", "expense"},
 	{"education", "Təhsil", "Education", "book", "expense"},
 	{"housing", "Kirayə və ev", "Housing", "home", "expense"},
@@ -142,18 +148,18 @@ var rules = []rule{
 	// Shopping
 	r(`TRENDYOL`, "Trendyol", "shopping"),
 	r(`UMICO`, "Umico", "shopping"),
-	r(`ZARA`, "Zara", "shopping"),
-	r(`KONTAKT HOME`, "Kontakt Home", "shopping"),
+	r(`ZARA`, "Zara", "clothes"),
+	r(`KONTAKT HOME`, "Kontakt Home", "tech"),
 	r(`AMAZON`, "Amazon", "shopping"),
 
 	// Health and education
 	r(`ZEYTUN APTEK`, "Zeytun Aptek", "health"),
 	r(`AVROMED`, "Avromed", "health"),
 	r(`APTEK`, "Aptek", "health"),
-	r(`LC WAIKIKI`, "LC Waikiki", "shopping"),
-	r(`ALI VE NINO`, "Ali & Nino", "education"),
-	r(`OFIS MARKET`, "Ofis Market", "education"),
-	r(`BAKU BOOK CENTER`, "Baku Book Center", "education"),
+	r(`LC WAIKIKI`, "LC Waikiki", "clothes"),
+	r(`ALI VE NINO`, "Ali & Nino", "school"),
+	r(`OFIS MARKET`, "Ofis Market", "school"),
+	r(`BAKU BOOK CENTER`, "Baku Book Center", "school"),
 	r(`REPETITOR|TEDRIS`, "", "education"),
 }
 
@@ -163,8 +169,8 @@ var mccCategories = map[string]string{
 	"4121": "transport", "4111": "transport", "5541": "transport",
 	"4900": "utilities", "4814": "telecom",
 	"4899": "subscriptions", "5815": "subscriptions", "5818": "subscriptions",
-	"5311": "shopping", "5651": "shopping", "5641": "shopping", "5732": "shopping",
-	"5912": "health", "5942": "education", "5943": "education", "8299": "education",
+	"5311": "shopping", "5651": "clothes", "5641": "clothes", "5732": "tech", "5712": "home",
+	"5912": "health", "5942": "school", "5943": "school", "8299": "education",
 	"6011": "cash",
 }
 

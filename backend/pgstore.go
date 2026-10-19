@@ -112,6 +112,20 @@ CREATE TABLE IF NOT EXISTS budgets (
 	limit_minor  bigint NOT NULL,
 	PRIMARY KEY (psu_id, id)
 );
+-- v0.2: amount spent before our data starts, entered by the user.
+ALTER TABLE budgets ADD COLUMN IF NOT EXISTS already_spent_minor bigint NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS purchase_plans (
+	psu_id       text NOT NULL REFERENCES users ON DELETE CASCADE,
+	id           text NOT NULL,
+	name         text NOT NULL,
+	price_minor  bigint NOT NULL,
+	currency     text NOT NULL,
+	category_key text NOT NULL,
+	status       text NOT NULL CHECK (status IN ('planned', 'dropped', 'bought')),
+	created_at   timestamptz NOT NULL,
+	updated_at   timestamptz NOT NULL,
+	PRIMARY KEY (psu_id, id)
+);
 CREATE TABLE IF NOT EXISTS alerts (
 	psu_id     text NOT NULL REFERENCES users ON DELETE CASCADE,
 	id         text NOT NULL,
@@ -135,7 +149,7 @@ CREATE TABLE IF NOT EXISTS fx_rates (
 // childTables are rewritten on every save, in an order that respects nothing
 // but the users foreign key, so any order works.
 var childTables = []string{"connections", "accounts", "transactions", "category_overrides",
-	"recurring_overrides", "manual_recurring", "loans", "budgets", "alerts"}
+	"recurring_overrides", "manual_recurring", "loans", "budgets", "purchase_plans", "alerts"}
 
 func OpenPostgres(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	var pool *pgxpool.Pool
@@ -296,9 +310,17 @@ func saveUser(ctx context.Context, tx pgx.Tx, u *UserState) error {
 
 	rows = nil
 	for _, b := range u.Budgets {
-		rows = append(rows, []any{u.PSUID, b.ID, b.CategoryKey, b.Period, b.LimitMinor})
+		rows = append(rows, []any{u.PSUID, b.ID, b.CategoryKey, b.Period, b.LimitMinor, b.AlreadySpentMinor})
 	}
-	if err := copyRows("budgets", []string{"psu_id", "id", "category_key", "period", "limit_minor"}, rows); err != nil {
+	if err := copyRows("budgets", []string{"psu_id", "id", "category_key", "period", "limit_minor", "already_spent_minor"}, rows); err != nil {
+		return err
+	}
+
+	rows = nil
+	for _, p := range u.PurchasePlans {
+		rows = append(rows, []any{u.PSUID, p.ID, p.Name, p.PriceMinor, p.Currency, p.CategoryKey, p.Status, p.CreatedAt, p.UpdatedAt})
+	}
+	if err := copyRows("purchase_plans", []string{"psu_id", "id", "name", "price_minor", "currency", "category_key", "status", "created_at", "updated_at"}, rows); err != nil {
 		return err
 	}
 
@@ -508,11 +530,29 @@ func LoadStateDB(ctx context.Context, db *pgxpool.Pool) (*State, error) {
 		return nil, err
 	}
 
-	err = each(`SELECT psu_id, id, category_key, period, limit_minor FROM budgets ORDER BY id`,
+	err = each(`SELECT psu_id, id, name, price_minor, currency, category_key, status, created_at, updated_at FROM purchase_plans ORDER BY created_at, id`,
+		func(r pgx.Rows) error {
+			var psu string
+			p := &PurchasePlan{}
+			if err := r.Scan(&psu, &p.ID, &p.Name, &p.PriceMinor, &p.Currency, &p.CategoryKey, &p.Status, &p.CreatedAt, &p.UpdatedAt); err != nil {
+				return err
+			}
+			u := s.Users[psu]
+			if u == nil {
+				return nil
+			}
+			u.PurchasePlans = append(u.PurchasePlans, p)
+			return nil
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	err = each(`SELECT psu_id, id, category_key, period, limit_minor, already_spent_minor FROM budgets ORDER BY id`,
 		func(r pgx.Rows) error {
 			var psu string
 			b := &Budget{}
-			if err := r.Scan(&psu, &b.ID, &b.CategoryKey, &b.Period, &b.LimitMinor); err != nil {
+			if err := r.Scan(&psu, &b.ID, &b.CategoryKey, &b.Period, &b.LimitMinor, &b.AlreadySpentMinor); err != nil {
 				return err
 			}
 			u := s.Users[psu]

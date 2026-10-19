@@ -32,7 +32,8 @@ The API works on an in-memory copy of the data. After every change it rewrites t
 | `category_overrides` | categories the user changed, per transaction or per merchant |
 | `recurring_overrides`, `manual_recurring` | edits to detected recurring items, and items added by hand |
 | `loans` | loan details the user entered, and manual loans |
-| `budgets` | the user's budgets |
+| `budgets` | the user's budgets (week, month or year) with the manual "already spent" figure |
+| `purchase_plans` | purchase planner entries: planned, dropped ("Don't buy") or bought |
 | `alerts` | generated alerts with read state (`params` is JSONB) |
 | `fx_rates` | the latest CBAR rates |
 
@@ -64,7 +65,27 @@ Tokens are `demo.<psuId>`, so the app can also hard-code one.
 ## Endpoints
 
 Everything in the contract is implemented:
-auth (demo), banks, connections (create, list, poll, renew, delete), sync, home, accounts, transactions (filters, cursor paging, re-categorise with `applyToMerchant`), categories, summary, recurring (list, calendar, create, edit, delete), loans, budgets, safe-to-spend, streak, alerts, me.
+auth (demo), banks, connections (create, list, poll, renew, delete), sync, home, accounts, transactions (filters incl. `bankCode` and `recurringId`, cursor paging, `GET /transactions/{id}`, re-categorise with `applyToMerchant`), categories, summary, recurring (list, calendar, create, edit, delete), loans, budgets (week, month, year; `alreadySpent`; `dataSince`), purchase planner, safe-to-spend, streak, alerts, me.
+
+### Purchase planner (contract v0.2–v0.3)
+
+```bash
+# Dry run: nothing is saved.
+curl -X POST -H "$T" $API/purchase-plans/check -d '{"name":"Washing machine","price":{"amountMinor":120000,"currency":"AZN"},"categoryId":"cat-assets"}'
+# → status no_limit until the user has a limit for that category:
+curl -X POST -H "$T" $API/budgets -d '{"categoryId":"cat-assets","period":"year","limit":{"amountMinor":500000,"currency":"AZN"},"alreadySpent":{"amountMinor":410000,"currency":"AZN"}}'
+# → check again: projected 5300 ₼, pct 106, status exceeds, overage 300 ₼
+
+curl -X POST -H "$T" $API/purchase-plans -d '{"name":"Washing machine","price":{"amountMinor":120000,"currency":"AZN"},"categoryId":"cat-assets","status":"dropped"}'  # "Don't buy"
+curl -H "$T" "$API/purchase-plans?status=planned"
+curl -X PATCH -H "$T" $API/purchase-plans/plan_3 -d '{"status":"bought"}'
+```
+
+- Planner categories: `cat-clothes`, `cat-home`, `cat-tech`, `cat-school`, `cat-health`, `cat-assets`, `cat-other`. They are regular categories, so bank transactions land in them too (Zara, LC Waikiki → clothes; Kontakt Home → tech; Ali & Nino, Ofis Market → school).
+- The limit is the user's own budget for that category; with several, the longest period wins (year over month over week). Baselines don't count as limits.
+- `spentSoFar` = spending in the limit's period + the budget's `alreadySpent`. `plannedOther` = other plans with status `planned` in the same category.
+- `fits` ≤ 80% of the limit < `close` ≤ 100% < `exceeds`. `pct` is a whole number.
+- Rəşad's demo data has ~1 244 ₼ of school supplies (Aug–Sep), so a yearly school limit shows the planner working on real transactions.
 
 ### Additions to contract v0.1 (for the next version)
 

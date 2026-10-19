@@ -50,6 +50,7 @@ func (app *App) routes() http.Handler {
 	auth("GET "+p+"/accounts", app.listAccounts)
 	auth("GET "+p+"/accounts/{id}", app.getAccount)
 	auth("GET "+p+"/transactions", app.listTransactions)
+	auth("GET "+p+"/transactions/{id}", app.getTransaction)
 	auth("PATCH "+p+"/transactions/{id}", app.patchTransaction)
 	auth("GET "+p+"/categories", app.listCategories)
 	auth("GET "+p+"/summary", app.summary)
@@ -69,6 +70,11 @@ func (app *App) routes() http.Handler {
 	auth("POST "+p+"/budgets", app.createBudget)
 	auth("PATCH "+p+"/budgets/{id}", app.patchBudget)
 	auth("DELETE "+p+"/budgets/{id}", app.deleteBudget)
+
+	auth("POST "+p+"/purchase-plans/check", app.checkPurchasePlan)
+	auth("POST "+p+"/purchase-plans", app.createPurchasePlan)
+	auth("GET "+p+"/purchase-plans", app.listPurchasePlans)
+	auth("PATCH "+p+"/purchase-plans/{id}", app.patchPurchasePlan)
 
 	auth("GET "+p+"/safe-to-spend", app.safeToSpendHandler)
 	auth("GET "+p+"/streak", app.streakHandler)

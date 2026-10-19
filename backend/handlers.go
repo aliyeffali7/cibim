@@ -367,6 +367,8 @@ func (app *App) listTransactions(w http.ResponseWriter, r *http.Request, u *User
 	for _, t := range a.txs {
 		switch {
 		case q.Get("accountId") != "" && t.AccountID != q.Get("accountId"),
+			q.Get("bankCode") != "" && t.BankCode != q.Get("bankCode"),
+			q.Get("recurringId") != "" && t.recurringID != q.Get("recurringId"),
 			categoryKey != "" && t.category != categoryKey,
 			q.Get("direction") == "in" && t.AmountMinor < 0,
 			q.Get("direction") == "out" && t.AmountMinor > 0,
@@ -402,6 +404,16 @@ func paginate[T any](items []T, limitStr, cursor string) ([]T, *string) {
 		return page, &next
 	}
 	return page, nil
+}
+
+func (app *App) getTransaction(w http.ResponseWriter, r *http.Request, u *UserState) {
+	a := app.analysis(r, u)
+	t := a.txByID[r.PathValue("id")]
+	if t == nil {
+		writeError(w, http.StatusNotFound, "NOT_FOUND", "No transaction "+r.PathValue("id"))
+		return
+	}
+	writeJSON(w, http.StatusOK, a.txView(t))
 }
 
 func (app *App) patchTransaction(w http.ResponseWriter, r *http.Request, u *UserState) {
@@ -884,10 +896,13 @@ func (app *App) listBudgets(w http.ResponseWriter, r *http.Request, u *UserState
 }
 
 type budgetInput struct {
-	CategoryID *string    `json:"categoryId"`
-	Period     string     `json:"period"`
-	Limit      *moneyJSON `json:"limit"`
+	CategoryID   *string    `json:"categoryId"`
+	Period       string     `json:"period"`
+	Limit        *moneyJSON `json:"limit"`
+	AlreadySpent *moneyJSON `json:"alreadySpent"` // spent this period before our data starts
 }
+
+func validPeriod(p string) bool { return p == "week" || p == "month" || p == "year" }
 
 func (app *App) createBudget(w http.ResponseWriter, r *http.Request, u *UserState) {
 	var in budgetInput
@@ -908,10 +923,13 @@ func (app *App) createBudget(w http.ResponseWriter, r *http.Request, u *UserStat
 		key = k
 	}
 	period := in.Period
-	if period != "week" {
+	if !validPeriod(period) {
 		period = "month"
 	}
 	b := &Budget{ID: u.nextID("bud"), CategoryKey: key, Period: period, LimitMinor: abs64(in.Limit.AmountMinor)}
+	if in.AlreadySpent != nil {
+		b.AlreadySpentMinor = abs64(in.AlreadySpent.AmountMinor)
+	}
 	u.Budgets = append(u.Budgets, b)
 	app.generateAlerts(u)
 	app.persist()
@@ -947,8 +965,11 @@ func (app *App) patchBudget(w http.ResponseWriter, r *http.Request, u *UserState
 	if in.Limit != nil {
 		b.LimitMinor = abs64(in.Limit.AmountMinor)
 	}
-	if in.Period == "week" || in.Period == "month" {
+	if validPeriod(in.Period) {
 		b.Period = in.Period
+	}
+	if in.AlreadySpent != nil {
+		b.AlreadySpentMinor = abs64(in.AlreadySpent.AmountMinor)
 	}
 	app.generateAlerts(u)
 	app.persist()

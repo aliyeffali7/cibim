@@ -500,7 +500,7 @@ func (a *Analysis) income(from, to time.Time) int64 {
 	return sum
 }
 
-// periodRange returns the day, ISO week (Mon–Sun) or month containing d.
+// periodRange returns the day, ISO week (Mon–Sun), month or year containing d.
 func periodRange(period string, d time.Time) (time.Time, time.Time) {
 	switch period {
 	case "day":
@@ -509,6 +509,9 @@ func periodRange(period string, d time.Time) (time.Time, time.Time) {
 		offset := (int(d.Weekday()) + 6) % 7
 		start := d.AddDate(0, 0, -offset)
 		return start, start.AddDate(0, 0, 6)
+	case "year":
+		start := time.Date(d.Year(), time.January, 1, 0, 0, 0, 0, baku)
+		return start, start.AddDate(1, 0, -1)
 	default:
 		start := time.Date(d.Year(), d.Month(), 1, 0, 0, 0, 0, baku)
 		return start, start.AddDate(0, 1, -1)
@@ -630,12 +633,31 @@ func budgetable(category string) bool {
 }
 
 type budgetView struct {
-	ID       string
-	Category string // empty = total
-	Period   string
-	Limit    int64
-	Spent    int64
-	Basis    string // user | baseline
+	ID           string
+	Category     string // empty = total
+	Period       string
+	Limit        int64
+	Spent        int64 // includes AlreadySpent
+	AlreadySpent int64
+	Basis        string // user | baseline
+}
+
+// userBudget measures one of the user's budgets: spending in the current period,
+// plus what they told us they spent before our data starts.
+func (a *Analysis) userBudget(b *Budget) budgetView {
+	start, end := periodRange(b.Period, a.today)
+	spent := a.spending(start, end, func(t *txView) bool { return b.CategoryKey == "" || t.category == b.CategoryKey })
+	return budgetView{ID: b.ID, Category: b.CategoryKey, Period: b.Period, Limit: b.LimitMinor, Basis: "user",
+		Spent: spent + b.AlreadySpentMinor, AlreadySpent: b.AlreadySpentMinor}
+}
+
+// dataSince is the earliest day we have bank data for, or nil before the first sync.
+func (a *Analysis) dataSince() *string {
+	if len(a.txs) == 0 {
+		return nil
+	}
+	d := a.firstDate.Format(dateLayout)
+	return &d
 }
 
 func (b budgetView) pct() float64 {
@@ -691,9 +713,7 @@ func (a *Analysis) budgets(u *UserState) []budgetView {
 	var out []budgetView
 	has := map[string]bool{}
 	for _, b := range u.Budgets {
-		start, end := periodRange(b.Period, a.today)
-		out = append(out, budgetView{ID: b.ID, Category: b.CategoryKey, Period: b.Period, Limit: b.LimitMinor, Basis: "user",
-			Spent: a.spending(start, end, func(t *txView) bool { return b.CategoryKey == "" || t.category == b.CategoryKey })})
+		out = append(out, a.userBudget(b))
 		has[b.CategoryKey+"|"+b.Period] = true
 	}
 	if len(u.Accounts) == 0 {

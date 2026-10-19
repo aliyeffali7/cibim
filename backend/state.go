@@ -82,10 +82,23 @@ type LoanInfo struct {
 }
 
 type Budget struct {
-	ID          string `json:"id"`
-	CategoryKey string `json:"categoryKey"` // empty = total spending
-	Period      string `json:"period"`      // week | month
-	LimitMinor  int64  `json:"limitMinor"`
+	ID                string `json:"id"`
+	CategoryKey       string `json:"categoryKey"` // empty = total spending
+	Period            string `json:"period"`      // week | month | year
+	LimitMinor        int64  `json:"limitMinor"`
+	AlreadySpentMinor int64  `json:"alreadySpentMinor"` // spent this period before our data starts, entered by the user
+}
+
+// PurchasePlan is a purchase the user checked before buying (the purchase planner).
+type PurchasePlan struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	PriceMinor  int64     `json:"priceMinor"`
+	Currency    string    `json:"currency"`
+	CategoryKey string    `json:"categoryKey"`
+	Status      string    `json:"status"` // planned | dropped | bought
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Alert struct {
@@ -122,6 +135,7 @@ type UserState struct {
 	ManualRecurring    []*ManualRecurring            `json:"manualRecurring"`
 	Loans              map[string]*LoanInfo          `json:"loans"`
 	Budgets            []*Budget                     `json:"budgets"`
+	PurchasePlans      []*PurchasePlan               `json:"purchasePlans"`
 	Alerts             []*Alert                      `json:"alerts"`
 	Seq                int                           `json:"seq"`
 }
